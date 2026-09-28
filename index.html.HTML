@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>车间人效计算器</title>
+<style>
+:root{
+  --primary:#2563eb; --primary-d:#1d4ed8; --primary-l:#eff6ff;
+  --bg:#f4f6fa; --card:#fff; --border:#e2e8f0;
+  --text:#1e293b; --muted:#64748b; --muted-l:#94a3b8;
+  --warn:#f59e0b; --warn-bg:#fffbeb; --danger:#ef4444; --ok:#10b981;
+  --radius:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;
+}
+button,input,select{font-family:inherit;font-size:inherit}
+
+/* ---------- 布局 ---------- */
+.layout{display:flex;min-height:100vh;align-items:flex-start}
+.sidebar{
+  width:290px;flex:0 0 290px;background:#fff;border-right:1px solid var(--border);
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;
+}
+.sidebar-head{padding:16px 18px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--primary)}
+.brand-icon{font-size:18px}
+.sidebar-body{flex:1;overflow-y:auto;padding:12px}
+.sidebar-title{
+  font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.5px;
+  display:flex;align-items:center;justify-content:space-between;padding:4px 6px 10px;
+}
+.count{
+  background:var(--primary-l);color:var(--primary);border-radius:20px;
+  padding:1px 8px;font-size:11px;font-weight:600;
+}
+.sidebar-foot{padding:12px;border-top:1px solid var(--border)}
+
+.content{flex:1;min-width:0;padding:20px 24px 48px;max-width:1180px;margin:0 auto;width:100%}
+
+/* ---------- 顶部栏 ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.topbar h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.3px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- 按钮 ---------- */
+.btn{
+  border:1px solid var(--border);background:#fff;color:var(--text);
+  padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;
+  transition:.15s;white-space:nowrap;
+}
+.btn:hover{border-color:#cbd5e1;background:#f8fafc}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-d);border-color:var(--primary-d)}
+.btn-danger-ghost{color:var(--danger);border-color:#fecaca}
+.btn-danger-ghost:hover{background:#fef2f2;border-color:#fca5a5}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-block{width:100%}
+
+/* ---------- 卡片 ---------- */
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+.card-title{font-size:15px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.card-head .card-title{margin:0}
+.hint{font-size:12px;font-weight:400;color:var(--muted-l)}
+
+/* ---------- 表单 ---------- */
+.grid{display:grid;gap:14px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>span{font-size:12.5px;color:var(--muted);font-weight:500}
+.field input{
+  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;
+  background:#fff;color:var(--text);outline:none;transition:.15s;
+}
+.field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+
+/* ---------- 表格 ---------- */
+.table-wrap{overflow-x:auto;margin:0 -4px;padding:0 4px}
+table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}
+thead th{
+  font-size:12px;font-weight:600;color:var(--muted);text-align:left;
+  padding:8px 8px;border-bottom:1px solid var(--border);white-space:nowrap;line-height:1.3;
+}
+thead th small{font-weight:400;color:var(--muted-l);font-size:11px}
+tbody td{padding:6px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.bottleneck{background:var(--warn-bg)}
+tbody tr.bottleneck td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+
+/* 拖拽相关样式 */
+tbody tr.dragging{opacity:.4;background:#f1f5f9}
+tbody tr.drag-over-top td{border-top:2px solid var(--primary)}
+tbody tr.drag-over-bottom td{border-bottom:2px solid var(--primary)}
+.drag-handle{
+  cursor:grab;user-select:none;text-align:center;
+  font-size:16px;color:var(--muted-l);padding:0 4px !important;
+  font-weight:bold;
+}
+.drag-handle:active{cursor:grabbing}
+.drag-handle:hover{color:var(--primary)}
+
+.idx{color:var(--muted-l);font-size:12.5px;text-align:center;font-variant-numeric:tabular-nums}
+.inp{
+  width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:7px;
+  background:#fff;color:var(--text);outline:none;transition:.15s;
+}
+.inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.inp.invalid{border-color:var(--danger);background:#fef2f2}
+.inp-num{text-align:right;font-variant-numeric:tabular-nums}
+.calc{
+  text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);
+  font-size:13px;white-space:nowrap;
+}
+tr.bottleneck .calc{color:#b45309;font-weight:600}
+.btn-del{
+  border:none;background:transparent;color:var(--muted-l);cursor:pointer;
+  font-size:15px;line-height:1;padding:6px 8px;border-radius:6px;transition:.15s;
+}
+.btn-del:hover{background:#fef2f2;color:var(--danger)}
+
+/* ---------- 结果 ---------- */
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+.rc{
+  border:1px solid var(--border);border-radius:9px;padding:13px 14px;
+  background:#fcfdff;min-width:0;
+}
+.rc-highlight{background:var(--primary-l);border-color:#bfdbfe}
+.rc-label{font-size:12px;color:var(--muted);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-value{
+  font-size:19px;font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums;word-break:break-all;line-height:1.25;
+}
+.rc-highlight .rc-value{color:var(--primary-d)}
+.rc-unit{font-size:11.5px;color:var(--muted-l);margin-top:2px}
+.order-result{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border)}
+.order-title{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:.3px}
+.order-result.hidden{display:none}
+
+/* ---------- 历史记录 ---------- */
+.history-list{display:flex;flex-direction:column;gap:8px}
+.empty{text-align:center;color:var(--muted-l);font-size:12.5px;padding:24px 8px}
+.hist-item{
+  border:1px solid var(--border);border-radius:8px;padding:10px 11px;cursor:pointer;
+  transition:.15s;background:#fff;
+}
+.hist-item:hover{border-color:#bfdbfe;background:var(--primary-l)}
+.hist-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.hist-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-del{
+  border:none;background:transparent;color:var(--muted-l);cursor:pointer;
+  font-size:13px;padding:0 3px;line-height:1;flex-shrink:0;border-radius:4px;
+}
+.hist-del:hover{color:var(--danger);background:#fef2f2}
+.hist-sub{font-size:11.5px;color:var(--muted-l);margin-top:3px}
+.hist-meta{font-size:11.5px;color:var(--primary);margin-top:5px;font-weight:500}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);
+  background:rgba(30,41,59,.94);color:#fff;padding:10px 20px;border-radius:24px;
+  font-size:13px;opacity:0;pointer-events:none;transition:.28s;z-index:9999;
+  box-shadow:0 8px 24px rgba(0,0,0,.2);
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:1100px){
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:860px){
+  .layout{flex-direction:column}
+  .sidebar{
+    width:100%;flex:none;height:auto;position:relative;
+    border-right:none;border-bottom:1px solid var(--border);
+  }
+  .sidebar-body{max-height:230px}
+  .content{padding:16px 14px 40px}
+  .grid-3{grid-template-columns:1fr}
+  .grid-4{grid-template-columns:1fr 1fr}
+  .result-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+  .rc-value{font-size:17px}
+}
+@media (max-width:480px){
+  .grid-4{grid-template-columns:1fr}
+  .topbar h1{font-size:17px}
+  .btn{padding:7px 11px;font-size:13px}
+}
+
+/* ---------- 打印 ---------- */
+@media print{
+  .no-print,.sidebar,#toast{display:none !important}
+  body{background:#fff;font-size:12px}
+  .layout{display:block}
+  .content{padding:0;max-width:none}
+  .card{
+    box-shadow:none;border:1px solid #ccc;page-break-inside:avoid;
+    margin-bottom:10px;padding:12px 14px;border-radius:0;
+  }
+  .inp,.field input{border:none !important;background:transparent !important;padding:0 !important;color:#000 !important;box-shadow:none !important}
+  .table-wrap{overflow:visible !important}
+  table{min-width:0 !important}
+  .rc{background:#fff !important;border-color:#ccc}
+  .rc-highlight{background:#f5f5f5 !important}
+  tbody tr.bottleneck{background:#f5f5f5 !important}
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ============ 侧边栏：历史记录 ============ -->
+  <aside class="sidebar no-print">
+    <div class="sidebar-head">
+      <div class="brand"><span class="brand-icon">⚙</span><span>车间人效计算器</span></div>
+    </div>
+    <div class="sidebar-body">
+      <div class="sidebar-title"><span>历史记录</span><span class="count" id="histCount">0</span></div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+    <div class="sidebar-foot">
+      <button class="btn btn-primary btn-block" id="btnSaveRecord">＋ 保存本次记录</button>
+    </div>
+  </aside>
+
+  <!-- ============ 主内容 ============ -->
+  <main class="content">
+
+    <div class="topbar">
+      <h1>车间人效计算器</h1>
+      <div class="actions no-print">
+        <button class="btn" id="btnExport">导出 CSV</button>
+        <button class="btn" id="btnPrint">打印</button>
+        <button class="btn btn-danger-ghost" id="btnReset">重置</button>
+      </div>
+    </div>
+
+    <!-- 基础信息 -->
+    <section class="card">
+      <h2 class="card-title">基础信息</h2>
+      <div class="grid grid-4">
+        <label class="field">
+          <span>产品 / 部件名称</span>
+          <input type="text" id="f-product" placeholder="例如：ABS 面板">
+        </label>
+        <label class="field">
+          <span>每日工作小时</span>
+          <input type="number" id="f-dailyHours" min="0" step="0.5" placeholder="8">
+        </label>
+        <label class="field">
+          <span>人工单价（元 / 小时）</span>
+          <input type="number" id="f-laborRate" min="0" step="0.1" placeholder="0">
+        </label>
+        <label class="field">
+          <span>备注</span>
+          <input type="text" id="f-note" placeholder="选填">
+        </label>
+      </div>
+    </section>
+
+    <!-- 工序配置 -->
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">工序配置 <span class="hint">串联流水线 · 产量由瓶颈工序决定 · 按住左侧 ☰ 可拖拽排序</span></h2>
+        <button class="btn btn-primary btn-sm no-print" id="btnAddProc">＋ 添加工序</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:44px">☰</th>
+              <th style="min-width:140px">工序名称</th>
+              <th style="width:112px">作业工时<br><small>秒 / 人</small></th>
+              <th style="width:92px">作业人数</th>
+              <th style="width:92px">效率 %</th>
+              <th style="width:92px">良率 %</th>
+              <th style="width:112px">单件节拍<br><small>秒</small></th>
+              <th style="width:112px">有效节拍<br><small>秒</small></th>
+              <th style="width:124px">小时产量<br><small>件 / 小时</small></th>
+              <th style="width:56px" class="no-print">操作</th>
+            </tr>
+          </thead>
+          <tbody id="procBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 订单信息 -->
+    <section class="card">
+      <h2 class="card-title">订单信息 <span class="hint">订单数量选填；不填则只计算工时与人效</span></h2>
+      <div class="grid grid-3">
+        <label class="field">
+          <span>订单数量（件）</span>
+          <input type="number" id="f-orderQty" min="0" step="1" placeholder="选填">
+        </label>
+        <label class="field">
+          <span>换线准备时间（分钟）</span>
+          <input type="number" id="f-changeover" min="0" step="1" placeholder="0">
+        </label>
+        <label class="field">
+          <span>开始时间</span>
+          <input type="datetime-local" id="f-startTime">
+        </label>
+      </div>
+    </section>
+
+    <!-- 计算结果 -->
+    <section class="card" id="resultCard">
+      <h2 class="card-title">计算结果</h2>
+
+      <div class="result-grid">
+        <div class="rc rc-highlight">
+          <div class="rc-label">瓶颈工序</div>
+          <div class="rc-value" id="r-bottleneck">—</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">瓶颈有效节拍</div>
+          <div class="rc-value" id="r-ctEff">—</div>
+          <div class="rc-unit">秒 / 件</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">每小时理论产量</div>
+          <div class="rc-value" id="r-qTheory">—</div>
+          <div class="rc-unit">件 / 小时</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">每小时实际产量</div>
+          <div class="rc-value" id="r-qActual">—</div>
+          <div class="rc-unit">件 / 小时</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">总投入人数</div>
+          <div class="rc-value" id="r-workers">—</div>
+          <div class="rc-unit">人</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">人均小时产量</div>
+          <div class="rc-value" id="r-manpower">—</div>
+          <div class="rc-unit">件 / 人·小时</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">每件总人工工时</div>
+          <div class="rc-value" id="r-manSec">—</div>
+          <div class="rc-unit">人·秒 / 件</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">每件人工工时</div>
+          <div class="rc-value" id="r-manHour">—</div>
+          <div class="rc-unit">小时 / 件</div>
+        </div>
+        <div class="rc">
+          <div class="rc-label">每件人工成本</div>
+          <div class="rc-value" id="r-costUnit">—</div>
+          <div class="rc-unit">元 / 件</div>
+        </div>
+      </div>
+
+      <div class="order-result hidden" id="orderResult">
+        <div class="order-title">订单倒推</div>
+        <div class="result-grid">
+          <div class="rc rc-highlight">
+            <div class="rc-label">订单用时</div>
+            <div class="rc-value" id="r-orderMin">—</div>
+            <div class="rc-unit">分钟</div>
+          </div>
+          <div class="rc">
+            <div class="rc-label">预计完成时间</div>
+            <div class="rc-value" id="r-finish" style="font-size:15px">—</div>
+          </div>
+          <div class="rc">
+            <div class="rc-label">订单总人工工时</div>
+            <div class="rc-value" id="r-orderHours">—</div>
+            <div class="rc-unit">小时</div>
+          </div>
+          <div class="rc">
+            <div class="rc-label">订单总人工成本</div>
+            <div class="rc-value" id="r-orderCost">—</div>
+            <div class="rc-unit">元</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="emptyTip" style="color:var(--muted-l);font-size:12.5px;margin-top:14px;display:none">
+        提示：请先填写各工序的「作业工时」和「作业人数」。
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   车间人效计算器 —— 逻辑层
+   作业工时 = 单个工人完成该工序的时间（秒）
+   串联流水线，瓶颈决定整线产量
+   ========================================================= */
+
+const STORAGE_KEY = 'workshop_eff_calc_v1';
+const MAX_HISTORY = 50;
+
+/* ---------- 工具函数 ---------- */
+const $ = id => document.getElementById(id);
+
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+function fmt(n, d = 2){
+  if (n === null || n === undefined || !isFinite(n)) return '—';
+  const s = Number(n).toFixed(d);
+  return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
+function pad2(n){ return String(n).padStart(2, '0'); }
+
+function toLocalDatetimeValue(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function fmtDateTime(d){
+  if (!d || isNaN(d.getTime())) return '—';
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+let toastTimer;
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- 状态 ---------- */
+function defaultState(){
+  return {
+    product: '',
+    dailyHours: 8,
+    laborRate: 0,
+    note: '',
+    processes: [
+      { name: '工序1', time: '', workers: 1, eff: 100, yieldRate: 100 }
+    ],
+    orderQty: '',
+    changeover: 0,
+    startTime: toLocalDatetimeValue(new Date()),
+    history: []
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    const s = JSON.parse(raw);
+    const base = defaultState();
+    const merged = Object.assign(base, s);
+    if (!Array.isArray(merged.processes) || merged.processes.length === 0){
+      merged.processes = base.processes;
+    }
+    if (!Array.isArray(merged.history)) merged.history = [];
+    return merged;
+  }catch(e){
+    return defaultState();
+  }
+}
+
+let state = loadState();
+let lastResult = {};
+
+let saveTimer;
+function saveDebounced(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 300);
+}
+function saveNow(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function makeRow(i, p){
+  const name = esc(p.name ?? '');
+  const time = esc(p.time ?? '');
+  const workers = esc(p.workers ?? '');
+  const eff = esc(p.eff ?? 100);
+  const yr = esc(p.yieldRate ?? 100);
+  
+  // 注意：draggable 初始为 false，由 mousedown 动态控制
+  return `<tr data-row="${i}" draggable="false">
+    <td class="idx drag-handle" title="按住拖动排序">☰</td>
+    <td><input type="text" class="inp" data-i="${i}" data-field="name" value="${name}" placeholder="工序${i+1}"></td>
+    <td><input type="number" class="inp inp-num" data-i="${i}" data-field="time" value="${time}" min="0" step="0.1" placeholder="0"></td>
+    <td><input type="number" class="inp inp-num" data-i="${i}" data-field="workers" value="${workers}" min="1" step="1" placeholder="1"></td>
+    <td><input type="number" class="inp inp-num" data-i="${i}" data-field="eff" value="${eff}" min="1" max="100" step="1"></td>
+    <td><input type="number" class="inp inp-num" data-i="${i}" data-field="yieldRate" value="${yr}" min="1" max="100" step="1"></td>
+    <td class="calc c-ct">—</td>
+    <td class="calc c-cteff">—</td>
+    <td class="calc c-hourly">—</td>
+    <td class="no-print"><button class="btn-del" data-del="${i}" title="删除该工序">✕</button></td>
+  </tr>`;
+}
+
+function renderProcesses(){
+  $('procBody').innerHTML = state.processes.map((p, i) => makeRow(i, p)).join('');
+}
+
+function renderHistory(){
+  const box = $('historyList');
+  $('histCount').textContent = state.history.length;
+  if (!state.history.length){
+    box.innerHTML = '<div class="empty">暂无记录<br>点击下方按钮保存当前配置</div>';
+    return;
+  }
+  box.innerHTML = state.history.map(h => {
+    const s = h.summary || {};
+    const parts = [];
+    if (h.orderQty) parts.push('订单 ' + h.orderQty + ' 件');
+    if (s.qActual) parts.push('实际 ' + fmt(s.qActual, 1) + ' 件/小时');
+    if (s.orderMinutes) parts.push('用时 ' + fmt(s.orderMinutes, 1) + ' 分钟');
+    return `<div class="hist-item" data-id="${h.id}">
+      <div class="hist-top">
+        <span class="hist-name">${esc(h.product || '未命名产品')}</span>
+        <button class="hist-del" data-del-id="${h.id}" title="删除记录">✕</button>
+      </div>
+      <div class="hist-sub">${fmtDateTime(new Date(h.savedAt))}</div>
+      ${parts.length ? `<div class="hist-meta">${esc(parts.join(' · '))}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderAll(){
+  $('f-product').value    = state.product ?? '';
+  $('f-dailyHours').value = state.dailyHours ?? '';
+  $('f-laborRate').value  = state.laborRate ?? '';
+  $('f-note').value       = state.note ?? '';
+  $('f-orderQty').value   = state.orderQty ?? '';
+  $('f-changeover').value = state.changeover ?? '';
+  $('f-startTime').value  = state.startTime ?? '';
+  renderProcesses();
+  renderHistory();
+  compute();
+}
+
+/* =========================================================
+   核心计算
+   ========================================================= */
+function compute(){
+  const procs = state.processes;
+  const rows  = document.querySelectorAll('#procBody tr');
+
+  const details = [];
+  let maxCT = 0, maxCTEff = 0, bnIdx = -1;
+  let totalWorkers = 0, totalManSec = 0;
+
+  procs.forEach((p, i) => {
+    const t   = parseFloat(p.time) || 0;
+    const w   = parseInt(p.workers, 10) || 0;
+    const eff = (parseFloat(p.eff) || 100) / 100;
+    const yr  = (parseFloat(p.yieldRate) || 100) / 100;
+
+    const valid = t > 0 && w > 0;
+    let ct = 0, ctEff = 0, hourly = 0;
+
+    if (valid){
+      ct = t / w;                                        // 单件节拍
+      ctEff = (eff > 0 && yr > 0) ? ct / (eff * yr) : ct; // 有效节拍
+      hourly = ctEff > 0 ? 3600 / ctEff : 0;              // 该工序小时产量
+      if (ct > maxCT) maxCT = ct;
+      if (ctEff > maxCTEff){ maxCTEff = ctEff; bnIdx = i; }
+      totalWorkers += w;
+      totalManSec  += t;
+    }
+    details.push({ ct, ctEff, hourly, valid });
+  });
+
+  // 更新表格行
+  rows.forEach((tr, i) => {
+    const d = details[i];
+    tr.querySelector('.c-ct').textContent     = d.valid ? fmt(d.ct, 2)     : '—';
+    tr.querySelector('.c-cteff').textContent  = d.valid ? fmt(d.ctEff, 2)  : '—';
+    tr.querySelector('.c-hourly').textContent = d.valid ? fmt(d.hourly, 1) : '—';
+    tr.classList.toggle('bottleneck', i === bnIdx);
+  });
+
+  // 汇总
+  const hasValid       = bnIdx >= 0;
+  const bottleneckName = hasValid
+    ? (procs[bnIdx].name || ('工序' + (bnIdx + 1)))
+    : '—';
+  const qTheory  = maxCT > 0    ? 3600 / maxCT    : 0;
+  const qActual  = maxCTEff > 0 ? 3600 / maxCTEff : 0;
+  const manpower = totalWorkers > 0 ? qActual / totalWorkers : 0;
+  const manHourPerUnit = totalManSec / 3600;
+  const laborRate = parseFloat(state.laborRate) || 0;
+  const costPerUnit = manHourPerUnit * laborRate;
+
+  // 订单
+  const orderQty = parseInt(state.orderQty, 10) || 0;
+  const changeover = parseFloat(state.changeover) || 0;
+  let orderMinutes = 0, finishTime = null, orderManHours = 0, orderCost = 0;
+
+  if (orderQty > 0 && qActual > 0){
+    const prodMin = (orderQty / qActual) * 60;
+    orderMinutes = changeover + prodMin;
+    orderManHours = (totalManSec * orderQty) / 3600;
+    orderCost = orderManHours * laborRate;
+    if (state.startTime){
+      const st = new Date(state.startTime);
+      if (!isNaN(st.getTime())){
+        finishTime = new Date(st.getTime() + orderMinutes * 60000);
+      }
+    }
+  }
+
+  // 写入界面
+  $('r-bottleneck').textContent = bottleneckName;
+  $('r-ctEff').textContent   = hasValid ? fmt(maxCTEff, 2) : '—';
+  $('r-qTheory').textContent = qTheory > 0 ? fmt(qTheory, 1) : '—';
+  $('r-qActual').textContent = qActual > 0 ? fmt(qActual, 1) : '—';
+  $('r-workers').textContent = totalWorkers > 0 ? totalWorkers : '—';
+  $('r-manpower').textContent = manpower > 0 ? fmt(manpower, 2) : '—';
+  $('r-manSec').textContent   = totalManSec > 0 ? fmt(totalManSec, 1) : '—';
+  $('r-manHour').textContent  = totalManSec > 0 ? fmt(manHourPerUnit, 4) : '—';
+  $('r-costUnit').textContent = (totalManSec > 0 && laborRate > 0) ? fmt(costPerUnit, 2) : '—';
+
+  const orderBox = $('orderResult');
+  if (orderQty > 0 && qActual > 0){
+    orderBox.classList.remove('hidden');
+    $('r-orderMin').textContent   = fmt(orderMinutes, 1);
+    $('r-finish').textContent     = finishTime ? fmtDateTime(finishTime) : '—';
+    $('r-orderHours').textContent = fmt(orderManHours, 2);
+    $('r-orderCost').textContent  = laborRate > 0 ? fmt(orderCost, 2) : '—';
+  }else{
+    orderBox.classList.add('hidden');
+  }
+
+  $('emptyTip').style.display = hasValid ? 'none' : 'block';
+
+  lastResult = {
+    details, bnIdx, bottleneckName, qTheory, qActual,
+    totalWorkers, manpower, totalManSec, manHourPerUnit, costPerUnit,
+    orderMinutes, finishTime, orderManHours, orderCost, laborRate
+  };
+}
+
+/* =========================================================
+   事件绑定
+   ========================================================= */
+
+/* --- 工序表格：输入 --- */
+$('procBody').addEventListener('input', e => {
+  const el = e.target;
+  if (!el.matches('input[data-field]')) return;
+  const i = +el.dataset.i;
+  const f = el.dataset.field;
+  const p = state.processes[i];
+  if (!p) return;
+
+  p[f] = el.value;
+
+  // 简单校验
+  el.classList.remove('invalid');
+  const numFields = ['time','workers','eff','yieldRate'];
+  if (numFields.includes(f) && el.value !== ''){
+    const v = parseFloat(el.value);
+    if (isNaN(v) || v < 0 || (f === 'workers' && v < 1) ||
+        ((f === 'eff' || f === 'yieldRate') && (v < 1 || v > 100))){
+      el.classList.add('invalid');
+    }
+  }
+
+  saveDebounced();
+  compute();
+});
+
+/* --- 工序表格：删除 --- */
+$('procBody').addEventListener('click', e => {
+  const btn = e.target.closest('[data-del]');
+  if (!btn) return;
+  const i = +btn.dataset.del;
+  if (state.processes.length <= 1){
+    toast('至少保留一道工序');
+    return;
+  }
+  state.processes.splice(i, 1);
+  saveNow();
+  renderProcesses();
+  compute();
+});
+
+/* --- 拖拽排序逻辑 --- */
+let dragSrcIndex = -1;
+
+// 1. 鼠标按下时，决定是否允许拖拽（仅手柄允许）
+$('procBody').addEventListener('mousedown', e => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const handle = e.target.closest('.drag-handle');
+  if (handle) {
+    tr.draggable = true;
+  } else {
+    tr.draggable = false;
+  }
+});
+
+// 2. 开始拖拽
+$('procBody').addEventListener('dragstart', e => {
+  const tr = e.target.closest('tr');
+  if (!tr || !tr.draggable) {
+    e.preventDefault();
+    return;
+  }
+  dragSrcIndex = +tr.dataset.row;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrcIndex);
+  tr.classList.add('dragging');
+});
+
+// 3. 拖拽经过目标行，显示指示线
+$('procBody').addEventListener('dragover', e => {
+  e.preventDefault(); // 必须阻止默认行为才能允许放置
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const targetIndex = +tr.dataset.row;
+
+  // 清除其他行的指示线
+  document.querySelectorAll('#procBody tr').forEach(row => {
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+
+  if (targetIndex !== dragSrcIndex) {
+    const rect = tr.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const isAfter = e.clientY > midpoint;
+    tr.classList.add(isAfter ? 'drag-over-bottom' : 'drag-over-top');
+  }
+});
+
+// 4. 放下鼠标，执行排序
+$('procBody').addEventListener('drop', e => {
+  e.preventDefault();
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const targetIndex = +tr.dataset.row;
+
+  if (dragSrcIndex === -1 || dragSrcIndex === targetIndex) return;
+
+  // 确定插入到目标行的上方还是下方
+  const rect = tr.getBoundingClientRect();
+  const midpoint = rect.top + rect.height / 2;
+  const isAfter = e.clientY > midpoint;
+  let insertIndex = isAfter ? targetIndex + 1 : targetIndex;
+
+  // 如果是从上往下拖拽，插入位置需要减 1（因为源行会被移除）
+  if (dragSrcIndex < insertIndex) {
+    insertIndex--;
+  }
+
+  // 重新排序数组
+  const item = state.processes.splice(dragSrcIndex, 1)[0];
+  state.processes.splice(insertIndex, 0, item);
+
+  // 保存并重新渲染
+  saveNow();
+  renderProcesses();
+  compute();
+});
+
+// 5. 拖拽结束，清理样式
+$('procBody').addEventListener('dragend', e => {
+  const tr = e.target.closest('tr');
+  if (tr) tr.classList.remove('dragging');
+  document.querySelectorAll('#procBody tr').forEach(row => {
+    row.classList.remove('drag-over-top', 'drag-over-bottom');
+    row.draggable = false; // 重置 draggable
+  });
+  dragSrcIndex = -1;
+});
+
+/* --- 添加工序 --- */
+$('btnAddProc').addEventListener('click', () => {
+  const n = state.processes.length + 1;
+  state.processes.push({
+    name: '工序' + n,
+    time: '',
+    workers: 1,
+    eff: 100,
+    yieldRate: 100
+  });
+  saveNow();
+  renderProcesses();
+  compute();
+  // 滚动到新行
+  const tb = $('procBody');
+  const last = tb.lastElementChild;
+  if (last) last.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+/* --- 基础信息 / 订单信息 --- */
+const textFields = [
+  ['f-product',   'product',    'text'],
+  ['f-dailyHours','dailyHours', 'number'],
+  ['f-laborRate', 'laborRate',  'number'],
+  ['f-note',      'note',       'text'],
+  ['f-orderQty',  'orderQty',   'number'],
+  ['f-changeover','changeover', 'number'],
+  ['f-startTime', 'startTime',  'text']
+];
+
+textFields.forEach(([id, key]) => {
+  const el = $(id);
+  el.addEventListener('input', () => {
+    state[key] = el.value;
+    saveDebounced();
+    compute();
+  });
+  el.addEventListener('change', () => {
+    state[key] = el.value;
+    saveNow();
+    compute();
+  });
+});
+
+/* =========================================================
+   历史记录
+   ========================================================= */
+$('btnSaveRecord').addEventListener('click', () => {
+  const snap = JSON.parse(JSON.stringify(state));
+  delete snap.history;
+  snap.id = Date.now();
+  snap.savedAt = new Date().toISOString();
+  snap.summary = {
+    bottleneckName: lastResult.bottleneckName,
+    qTheory: lastResult.qTheory,
+    qActual: lastResult.qActual,
+    totalWorkers: lastResult.totalWorkers,
+    manpower: lastResult.manpower,
+    totalManSec: lastResult.totalManSec,
+    orderMinutes: lastResult.orderMinutes,
+    finishTime: lastResult.finishTime ? lastResult.finishTime.toISOString() : null,
+    orderManHours: lastResult.orderManHours,
+    orderCost: lastResult.orderCost
+  };
+  state.history.unshift(snap);
+  if (state.history.length > MAX_HISTORY) state.history.length = MAX_HISTORY;
+  saveNow();
+  renderHistory();
+  toast('已保存本次记录');
+});
+
+$('historyList').addEventListener('click', e => {
+  // 删除
+  const delBtn = e.target.closest('[data-del-id]');
+  if (delBtn){
+    e.stopPropagation();
+    const id = +delBtn.dataset.delId;
+    state.history = state.history.filter(h => h.id !== id);
+    saveNow();
+    renderHistory();
+    return;
+  }
+  // 加载
+  const item = e.target.closest('.hist-item');
+  if (!item) return;
+  const id = +item.dataset.id;
+  const h = state.history.find(x => x.id === id);
+  if (!h) return;
+  const hist = state.history;
+  const restored = Object.assign(defaultState(), JSON.parse(JSON.stringify(h)));
+  restored.history = hist;
+  state = restored;
+  saveNow();
+  renderAll();
+  window.scrollTo({top:0, behavior:'smooth'});
+  toast('已加载记录');
+});
+
+/* =========================================================
+   导出 CSV
+   ========================================================= */
+function download(content, filename, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1200);
+}
+
+$('btnExport').addEventListener('click', () => {
+  const r = lastResult;
+  const L = [];
+
+  L.push(['车间人效计算器 - 计算结果']);
+  L.push(['产品/部件', state.product || '']);
+  L.push(['每日工作小时', state.dailyHours || '']);
+  L.push(['人工单价(元/小时)', state.laborRate || 0]);
+  L.push(['备注', state.note || '']);
+  L.push(['导出时间', fmtDateTime(new Date())]);
+  L.push([]);
+
+  L.push(['一、工序明细']);
+  L.push(['序号','工序名称','作业工时(秒/人)','作业人数','效率(%)','良率(%)','单件节拍(秒)','有效节拍(秒)','小时产量(件)','是否瓶颈']);
+  state.processes.forEach((p, i) => {
+    const d = r.details[i] || {};
+    L.push([
+      i + 1,
+      p.name || ('工序' + (i + 1)),
+      p.time === '' ? '' : p.time,
+      p.workers === '' ? '' : p.workers,
+      p.eff ?? 100,
+      p.yieldRate ?? 100,
+      d.valid ? d.ct.toFixed(2) : '',
+      d.valid ? d.ctEff.toFixed(2) : '',
+      d.valid ? d.hourly.toFixed(1) : '',
+      i === r.bnIdx ? '是' : ''
+    ]);
+  });
+  L.push([]);
+
+  L.push(['二、汇总指标']);
+  L.push(['瓶颈工序', r.bottleneckName || '']);
+  L.push(['瓶颈有效节拍(秒/件)', r.qActual ? r.qActual.toFixed(2) : '']);
+  L.push(['每小时理论产量(件)', r.qTheory ? r.qTheory.toFixed(1) : '']);
+  L.push(['每小时实际产量(件)', r.qActual ? r.qActual.toFixed(1) : '']);
+  L.push(['总投入人数(人)', r.totalWorkers || 0]);
+  L.push(['人均小时产量(件/人·小时)', r.manpower ? r.manpower.toFixed(2) : '']);
+  L.push(['每件总人工工时(人·秒)', r.totalManSec ? r.totalManSec.toFixed(1) : '']);
+  L.push(['每件人工工时(小时)', r.manHourPerUnit ? r.manHourPerUnit.toFixed(4) : '']);
+  L.push(['每件人工成本(元)', r.costPerUnit ? r.costPerUnit.toFixed(2) : '']);
+  L.push([]);
+
+  if (r.orderMinutes > 0){
+    L.push(['三、订单倒推']);
+    L.push(['订单数量(件)', state.orderQty]);
+    L.push(['换线准备时间(分钟)', state.changeover || 0]);
+    L.push(['开始时间', state.startTime || '']);
+    L.push(['订单用时(分钟)', r.orderMinutes.toFixed(1)]);
+    L.push(['预计完成时间', r.finishTime ? fmtDateTime(r.finishTime) : '']);
+    L.push(['订单总人工工时(小时)', r.orderManHours.toFixed(2)]);
+    L.push(['订单总人工成本(元)', r.orderCost.toFixed(2)]);
+  }
+
+  const csv = L.map(row => row.map(cell => {
+    const s = String(cell ?? '');
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\r\n');
+
+  const fname = `人效计算_${state.product || '产品'}_${Date.now()}.csv`;
+  download('\ufeff' + csv, fname, 'text/csv;charset=utf-8');
+  toast('CSV 已导出');
+});
+
+/* =========================================================
+   打印 / 重置
+   ========================================================= */
+$('btnPrint').addEventListener('click', () => window.print());
+
+$('btnReset').addEventListener('click', () => {
+  if (!confirm('确定要重置所有输入吗？\n（历史记录会保留）')) return;
+  const hist = state.history;
+  state = defaultState();
+  state.history = hist;
+  saveNow();
+  renderAll();
+  toast('已重置');
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+renderAll();
+</script>
+</body>
+</html>
